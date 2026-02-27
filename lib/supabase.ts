@@ -17,8 +17,14 @@ export function getSupabaseClient(): SupabaseClient {
 export const supabase = {
   get client() {
     return getSupabaseClient();
+  },
+  get auth() {
+    return getSupabaseClient().auth;
+  },
+  from(table: string) {
+    return getSupabaseClient().from(table);
   }
-} as unknown as { client: SupabaseClient };
+} as unknown as SupabaseClient;
 
 export interface ApiKey {
   id: string;
