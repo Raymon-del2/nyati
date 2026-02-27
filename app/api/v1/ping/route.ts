@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Supabase configuration missing');
+  }
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase();
     const authHeader = request.headers.get('authorization');
     
     if (!authHeader || !authHeader.startsWith('Bearer ry_')) {
@@ -101,7 +107,6 @@ export async function GET(request: NextRequest) {
 
     const apiKey = authHeader.replace('Bearer ', '');
     
-    // For demo: accept any ry_ key
     if (!apiKey.startsWith('ry_')) {
       return NextResponse.json({ error: 'Invalid key format' }, { status: 401 });
     }
@@ -109,6 +114,8 @@ export async function GET(request: NextRequest) {
     const prefix = apiKey.substring(0, 4);
     const lastFour = apiKey.substring(apiKey.length - 4);
     const keyHint = `${prefix}...${lastFour}`;
+
+    const supabase = getSupabase();
 
     // Try to find in DB, if not found still allow for demo
     const { data: keyData } = await supabase
