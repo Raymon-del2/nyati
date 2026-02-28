@@ -75,16 +75,28 @@ export default function QuickStartPage() {
           <h3 className="text-lg font-medium text-white mb-3">cURL</h3>
           <CodeBlock
             language="bash"
-            code={`curl -X GET "https://api.nyati.io/v1/your-endpoint" \\
+            code={`# Test your API key with the proxy endpoint
+curl -X POST "https://your-domain.com/api/v1/proxy" \\
   -H "Authorization: Bearer ry_your_api_key_here" \\
   -H "Content-Type: application/json"`}
+          />
+
+          <h3 className="text-lg font-medium text-white mb-3">Response</h3>
+          <CodeBlock
+            language="json"
+            code={`{
+  "success": true,
+  "message": "Nyati Security Proxy",
+  "timestamp": "2026-02-28T12:00:00.000Z",
+  "validation_latency_ms": "2.45"
+}`}
           />
 
           <h3 className="text-lg font-medium text-white mb-3">TypeScript / JavaScript</h3>
           <CodeBlock
             language="typescript"
-            code={`const response = await fetch('https://api.nyati.io/v1/your-endpoint', {
-  method: 'GET',
+            code={`const response = await fetch('https://your-domain.com/api/v1/proxy', {
+  method: 'POST',
   headers: {
     'Authorization': 'Bearer ry_your_api_key_here',
     'Content-Type': 'application/json'
@@ -100,8 +112,8 @@ console.log(data);`}
             language="python"
             code={`import requests
 
-response = requests.get(
-    'https://api.nyati.io/v1/your-endpoint',
+response = requests.post(
+    'https://your-domain.com/api/v1/proxy',
     headers={
         'Authorization': 'Bearer ry_your_api_key_here',
         'Content-Type': 'application/json'
@@ -110,42 +122,35 @@ response = requests.get(
 
 print(response.json())`}
           />
+
+          <h3 className="text-lg font-medium text-white mb-3">Go</h3>
+          <CodeBlock
+            language="go"
+            code={`req, _ := http.NewRequest("POST", "https://your-domain.com/api/v1/proxy", nil)
+req.Header.Set("Authorization", "Bearer ry_your_api_key_here")
+
+client := &http.Client{}
+resp, _ := client.Do(req)
+defer resp.Body.Close()`}
+          />
         </div>
 
         <div className="bg-[#0c0c0c] border border-[#1a1a1a] rounded-2xl p-8 mb-8">
-          <h2 className="text-2xl font-semibold text-white mb-4">Step 3: Using the SDK (Recommended)</h2>
+          <h2 className="text-2xl font-semibold text-white mb-4">Step 3: Rate Limit Headers</h2>
           <p className="text-gray-400 mb-6">
-            For a better developer experience, use our official SDKs:
+            Every response includes rate limit information in the headers:
           </p>
 
-          <h3 className="text-lg font-medium text-white mb-3">Install the SDK</h3>
           <CodeBlock
             language="bash"
-            code={`# npm
-npm install @nyati/sdk
-
-# yarn
-yarn add @nyati/sdk
-
-# pnpm
-pnpm add @nyati/sdk`}
+            code={`# Response Headers
+X-Nyati-Limit-Remaining: 999
+X-Nyati-Limit-Reset: 2026-02-28T13:00:00.000Z`}
           />
 
-          <h3 className="text-lg font-medium text-white mb-3">Initialize the Client</h3>
-          <CodeBlock
-            language="typescript"
-            code={`import { Nyati } from '@nyati/sdk';
-
-const nyati = new Nyati({
-  apiKey: process.env.NYATI_API_KEY, // or 'ry_your_key_here'
-});
-
-// Make requests
-const result = await nyati.transduce({
-  data: yourData,
-  options: { /* your options */ }
-});`}
-          />
+          <p className="text-gray-400 text-sm">
+            The <code className="text-teal-300">X-Nyati-Limit-Remaining</code> header shows how many requests you have left in the current window.
+          </p>
         </div>
 
         <div className="bg-gradient-to-r from-teal-400/10 to-transparent border border-teal-400/20 rounded-2xl p-8">

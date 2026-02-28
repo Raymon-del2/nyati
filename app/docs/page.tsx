@@ -91,9 +91,37 @@ export default function IntroductionPage() {
             <div>
               <h3 className="text-lg font-medium text-teal-400 mb-2">Steel Protection</h3>
               <p className="text-gray-400 leading-relaxed">
-                We use multi-layer hashing (SHA-256 + Argon2) to ensure your raw keys never exist in plain text. 
+                We use salted SHA-256 hashing with constant-time comparison to ensure your raw keys never exist in plain text. 
                 Even we can't see them. Your keys are cryptographically isolated from the moment they're created.
               </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[#0c0c0c] border border-[#1a1a1a] rounded-2xl p-8 mb-8">
+          <h2 className="text-2xl font-semibold text-white mb-6">Security Features</h2>
+          
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="text-teal-400 mt-1">✓</span>
+              <div>
+                <h4 className="text-white font-medium">Salted Key Storage</h4>
+                <p className="text-gray-500 text-sm">Each API key gets a unique cryptographically secure salt before hashing</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-teal-400 mt-1">✓</span>
+              <div>
+                <h4 className="text-white font-medium">Constant-Time Comparison</h4>
+                <p className="text-gray-500 text-sm">Prevents timing attacks with XOR-based secure comparison</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-teal-400 mt-1">✓</span>
+              <div>
+                <h4 className="text-white font-medium">Latency Monitoring</h4>
+                <p className="text-gray-500 text-sm">Validation performance tracked in real-time (target: &lt;10ms)</p>
+              </div>
             </div>
           </div>
         </div>
