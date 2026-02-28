@@ -32,6 +32,7 @@ export interface ApiKey {
   key_hint: string;
   secret_hash: string;
   salt: string;
+  target_url: string | null;
   is_active: boolean;
   tier: string;
   created_at: string;

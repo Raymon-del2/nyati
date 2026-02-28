@@ -11,6 +11,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Skip validation for public API endpoints
+  if (request.nextUrl.pathname.startsWith('/api/search') || 
+      request.nextUrl.pathname.startsWith('/api/scrape')) {
+    return NextResponse.next();
+  }
+
   // Skip validation for proxy endpoint (handles its own validation)
   if (request.nextUrl.pathname.startsWith('/api/v1/proxy')) {
     return NextResponse.next();
