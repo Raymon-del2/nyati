@@ -1,8 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { 
+  Search, 
+  Bot, 
+  Shield, 
+  Terminal, 
+  ClipboardCopy, 
+  SendHorizontal, 
+  Volume2, 
+  VolumeX,
+  Cpu,
+  Brain,
+  Zap,
+  Link,
+  Wrench,
+  Sparkles
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { ApiKey } from '@/lib/supabase';
+import { NyatiAIIndicator } from '@/components/NyatiAIIndicator';
+import { ThinkingTrace } from '@/components/ThinkingTrace';
+import { TypewriterText } from '@/components/TypewriterText';
+import { useNyatiSound } from '@/hooks/useNyatiSound';
 
 export default function DeveloperPage() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
@@ -25,6 +46,12 @@ export default function DeveloperPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiLatency, setAiLatency] = useState<number | null>(null);
   const [aiProvider, setAiProvider] = useState<string>('groq');
+  const [aiIndicatorStatus, setAiIndicatorStatus] = useState<'waiting' | 'typing' | 'idle'>('idle');
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  // Sound effect hook
+  useNyatiSound(aiIndicatorStatus === 'typing', soundEnabled);
 
   useEffect(() => {
     fetchKeys();
@@ -135,26 +162,24 @@ export default function DeveloperPage() {
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setAiLoading(true);
+    setAiIndicatorStatus('waiting');
+    setIsStreaming(true);
     
     const startTime = performance.now();
-    let firstTokenTime: number | null = null;
     
     try {
       const newMessages = [...messages, userMessage];
       
-      const apiKeyToUse = selectedKey || 'ry_live_demo_key';
-      const res = await fetch(`/api/v1/ai`, {
+      const res = await fetch(`/api/internal/ai`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKeyToUse}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'llama3-8b-8192',
+          model: 'Nyati-core01',
           messages: newMessages,
           max_tokens: 500,
-          temperature: 0.7,
-          stream: true
+          temperature: 0.7
         })
       });
       
@@ -163,63 +188,15 @@ export default function DeveloperPage() {
         throw new Error(`HTTP ${res.status}: ${errorText.substring(0, 200)}`);
       }
       
-      if (!res.body) {
-        throw new Error('No response body');
-      }
+      const data = await res.json();
+      const assistantMessage = data.choices?.[0]?.message;
       
-      // Handle streaming response
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let fullContent = '';
-      
-      // Add assistant message placeholder
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.trim());
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') continue;
-            
-            try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content;
-              
-              if (content) {
-                if (!firstTokenTime) {
-                  firstTokenTime = performance.now() - startTime;
-                }
-                fullContent += content;
-                
-                // Update last message
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const lastMessage = newMessages[newMessages.length - 1];
-                  if (lastMessage.role === 'assistant') {
-                    lastMessage.content = fullContent;
-                  }
-                  return newMessages;
-                });
-              }
-            } catch {
-              // Skip invalid JSON
-            }
-          }
-        }
-      }
-      
-      const endTime = performance.now();
-      setAiLatency(endTime - startTime);
-      
-      // Store TTFT for display
-      if (firstTokenTime) {
-        setAiLatency(firstTokenTime);
+      if (assistantMessage) {
+        setMessages(prev => [...prev, assistantMessage]);
+        setAiLatency(performance.now() - startTime);
+        setAiIndicatorStatus('typing');
+      } else {
+        throw new Error('No response from AI');
       }
       
     } catch (error: any) {
@@ -229,6 +206,8 @@ export default function DeveloperPage() {
       }]);
     } finally {
       setAiLoading(false);
+      setIsStreaming(false);
+      setAiIndicatorStatus('idle');
     }
   }
 
@@ -251,23 +230,25 @@ export default function DeveloperPage() {
       <div className="mb-6 flex gap-2">
         <button
           onClick={() => setActiveSection('search')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
             activeSection === 'search' 
               ? 'bg-teal-400 text-black' 
               : 'bg-[#111] text-gray-400 hover:text-white'
           }`}
         >
-          🔍 Search
+          <Search className="w-4 h-4" />
+          Search
         </button>
         <button
           onClick={() => setActiveSection('ai')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
             activeSection === 'ai' 
               ? 'bg-teal-400 text-black' 
               : 'bg-[#111] text-gray-400 hover:text-white'
           }`}
         >
-          🤖 AI Chat
+          <Bot className="w-4 h-4" />
+          AI Chat
         </button>
       </div>
 
@@ -465,7 +446,7 @@ export default function DeveloperPage() {
                                   <svg className="w-8 h-8 text-gray-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                                 </div>
                               )}
-                              <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs text-teal-400">⚡ ~2ms</div>
+                              <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs text-teal-400 flex items-center gap-1"><Zap className="w-3 h-3" /> ~2ms</div>
                             </div>
                             <div className="p-2">
                               <p className="text-white text-xs font-medium line-clamp-2">{item.title}</p>
@@ -489,7 +470,7 @@ export default function DeveloperPage() {
                                 <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                               </div>
                             )}
-                            <div className="absolute top-1 right-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] text-teal-400">⚡ ~2ms</div>
+                            <div className="absolute top-1 right-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] text-teal-400 flex items-center gap-0.5"><Zap className="w-2.5 h-2.5" /> ~2ms</div>
                           </a>
                         ))}
                       </div>
@@ -515,56 +496,86 @@ export default function DeveloperPage() {
         /* AI Chat Section */
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* AI Chat Panel */}
-          <div className="bg-[#0c0c0c] border border-[#1a1a1a] rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">🤖 AI Chat (Nyati Shield)</h2>
-            
-            {/* Provider Selector */}
-            <div className="mb-4">
-              <label className="text-gray-400 text-sm mb-2 block">AI Provider</label>
-              <div className="flex gap-2">
-                {['groq', 'openai', 'anthropic'].map(provider => (
-                  <button
-                    key={provider}
-                    onClick={() => setAiProvider(provider)}
-                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                      aiProvider === provider 
-                        ? 'bg-teal-400 text-black' 
-                        : 'bg-[#111] text-gray-400 hover:text-white hover:bg-[#1a1a1a]'
-                    }`}
-                  >
-                    {provider.charAt(0).toUpperCase() + provider.slice(1)}
-                  </button>
-                ))}
+          <div className="bg-[#0c0c0c] border border-[#1a1a1a] rounded-2xl p-6 max-w-4xl mx-auto w-full">
+            {/* Header with Logo and Model Badge */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-teal-400/30 shadow-[0_0_15px_rgba(45,212,191,0.3)]">
+                  <Image 
+                    src="/logo.webp" 
+                    alt="Nyati" 
+                    fill 
+                    className="object-cover"
+                  />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">AI Chat</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-teal-400 font-mono">Nyati-core01</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400 border border-zinc-700 flex items-center gap-1">
+                      <Cpu className="w-3 h-3" />
+                      Local CPU
+                    </span>
+                  </div>
+                </div>
               </div>
+              
+              {/* Sound Toggle */}
+              <button 
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="p-2 rounded-lg hover:bg-zinc-800 transition-colors group"
+                title={soundEnabled ? "Mute AI Sounds" : "Unmute AI Sounds"}
+              >
+                {soundEnabled ? (
+                  <Volume2 className="w-5 h-5 text-teal-400 group-hover:text-teal-300" />
+                ) : (
+                  <VolumeX className="w-5 h-5 text-zinc-500 group-hover:text-red-400" />
+                )}
+              </button>
             </div>
-
-            {/* Shield Info */}
-            <div className="mb-4 p-3 bg-[#111] rounded-xl border border-teal-400/20">
-              <p className="text-teal-400 text-xs font-medium mb-1">🛡️ Nyati Shield Active</p>
-              <ul className="text-gray-500 text-xs space-y-1">
-                <li>• Token truncation: max 500 tokens</li>
-                <li>• Rate limit: 5 req/min per key</li>
-                <li>• Key rotation: Round-robin enabled</li>
-              </ul>
+            
+            {/* Provider Badge */}
+            <div className="mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#111] rounded-lg border border-zinc-800">
+                <span className="text-gray-500 text-xs">Provider</span>
+                <span className="text-teal-400 text-sm font-mono">-core01</span>
+              </div>
             </div>
 
             {/* Messages */}
             <div className="h-64 overflow-y-auto bg-[#111] rounded-xl p-4 mb-4 space-y-3">
               {messages.filter(m => m.role !== 'system').map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  {msg.role === 'assistant' && (
+                    <div className="mr-2 mt-1">
+                      <NyatiAIIndicator status={isStreaming && i === messages.length - 1 ? 'typing' : 'idle'} />
+                    </div>
+                  )}
                   <div className={`max-w-[80%] px-4 py-2 rounded-xl text-sm ${
                     msg.role === 'user' 
                       ? 'bg-teal-400 text-black' 
                       : 'bg-[#222] text-white'
                   }`}>
-                    {msg.content}
+                    {msg.role === 'assistant' && i === messages.length - 1 && isStreaming ? (
+                      <TypewriterText 
+                        text={msg.content} 
+                        isStreaming={isStreaming}
+                        onFirstToken={() => setAiIndicatorStatus('typing')}
+                      />
+                    ) : (
+                      msg.content
+                    )}
                   </div>
                 </div>
               ))}
               {aiLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-[#222] px-4 py-2 rounded-xl text-sm text-gray-400">
-                    <span className="animate-pulse">● ● ●</span>
+                  <div className="bg-[#222] px-4 py-3 rounded-xl flex items-center gap-3">
+                    <NyatiAIIndicator status="waiting" />
+                    <div className="flex flex-col">
+                      <span className="text-teal-400 text-sm font-medium">Nyati Core</span>
+                      <ThinkingTrace isWaiting={aiLoading} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -582,9 +593,10 @@ export default function DeveloperPage() {
               />
               <button
                 onClick={sendAiMessage}
-                disabled={aiLoading || !inputMessage.trim() || !selectedKey}
-                className="bg-teal-400 text-black px-4 py-3 rounded-xl font-medium hover:bg-teal-300 transition-colors disabled:opacity-50"
+                disabled={aiLoading || !inputMessage.trim()}
+                className="bg-teal-400 text-black px-4 py-3 rounded-xl font-medium hover:bg-teal-300 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
+                <SendHorizontal className="w-4 h-4" />
                 Send
               </button>
             </div>
@@ -598,46 +610,86 @@ export default function DeveloperPage() {
                 </div>
                 <div className="bg-[#111] px-3 py-2 rounded-lg">
                   <span className="text-gray-500 text-xs">Provider</span>
-                  <span className="text-teal-400 text-sm font-mono ml-2">Groq</span>
+                  <span className="text-teal-400 text-sm font-mono ml-2">-core01</span>
                 </div>
                 <div className="bg-[#111] px-3 py-2 rounded-lg">
-                  <span className="text-gray-500 text-xs">Streaming</span>
-                  <span className="text-green-400 text-sm ml-2">● Live</span>
+                  <span className="text-gray-500 text-xs">Status</span>
+                  <span className="text-green-400 text-sm ml-2 flex items-center gap-1">
+                    <Zap className="w-3 h-3" />
+                    Live
+                  </span>
                 </div>
               </div>
             )}
-
-            {!selectedKey && (
-              <p className="mt-4 text-yellow-400 text-sm">⚠️ Please select an API key above to use AI chat</p>
-            )}
           </div>
 
-          {/* Code Example Panel */}
-          <div className="bg-[#0c0c0c] border border-[#1a1a1a] rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Code Example</h2>
-            <div className="mb-4">
-              <p className="text-gray-500 text-sm mb-2">Use this in your app:</p>
-              <pre className="bg-[#111] rounded-xl p-4 overflow-x-auto text-xs font-mono text-gray-300">
-{`import OpenAI from 'openai';
+          {/* Nyati v2 Architect API Coming Soon Card */}
+          <div className="bg-[#0c0c0c] border border-[#1a1a1a] rounded-2xl p-6 relative overflow-hidden">
+            {/* Subtle teal gradient border effect */}
+            <div className="absolute inset-0 rounded-2xl border border-teal-400/20 pointer-events-none" />
+            <div className="absolute -top-20 -right-20 w-40 h-40 bg-teal-400/10 rounded-full blur-3xl" />
+            
+            <div className="relative">
+              {/* Header */}
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-teal-400" />
+                <h2 className="text-lg font-semibold text-white">Nyati v2: The Architect API</h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-teal-400/20 text-teal-400 border border-teal-400/30">
+                  Coming Soon
+                </span>
+              </div>
 
-const openai = new OpenAI({
-  apiKey: 'ry_live_your_key',
-  baseURL: 'https://api.nyati.dev/v1/proxy/${aiProvider}'
-});
+              {/* Feature List */}
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-zinc-800/50">
+                    <Brain className="w-4 h-4 text-teal-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-white">Recursive Memory</h3>
+                    <p className="text-xs text-gray-500">Our new /teach endpoint will allow the AI to remember 1M+ facts across every project you own.</p>
+                  </div>
+                </div>
 
-const response = await openai.chat.completions.create({
-  model: '${aiProvider === 'groq' ? 'llama3-8b-8192' : 'gpt-4'}',
-  messages: [{ role: 'user', content: 'Hello!' }],
-});
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-zinc-800/50">
+                    <Link className="w-4 h-4 text-teal-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-white">Neural Linking</h3>
+                    <p className="text-xs text-gray-500">Integrate your own local PDF, Notion, or GitHub docs into the model's brain in under 2 seconds.</p>
+                  </div>
+                </div>
 
-console.log(response.choices[0].message.content);`}
-              </pre>
-            </div>
-            <div className="p-3 bg-[#111] rounded-xl border border-teal-400/20">
-              <p className="text-teal-400 text-xs font-medium mb-1">🛡️ Steel Protection</p>
-              <p className="text-gray-500 text-xs">
-                Nyati strips PII, truncates tokens, and rotates keys automatically.
-              </p>
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-zinc-800/50">
+                    <Zap className="w-4 h-4 text-teal-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-white">Zero-Latency Fallback</h3>
+                    <p className="text-xs text-gray-500">Automatic switching between local Nyati-core01 and Cloud for uninterrupted service.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-zinc-800/50">
+                    <Wrench className="w-4 h-4 text-teal-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-white">Custom Fine-Tuning</h3>
+                    <p className="text-xs text-gray-500">One-click training to make the AI speak in your specific brand voice.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="mt-6 pt-4 border-t border-zinc-800">
+                <p className="text-xs text-gray-600 mb-3">Join the waitlist to get early access to the Architect API.</p>
+                <button className="w-full py-2.5 px-4 bg-teal-400/10 hover:bg-teal-400/20 border border-teal-400/30 rounded-lg text-teal-400 text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Request Alpha Access
+                </button>
+              </div>
             </div>
           </div>
         </div>

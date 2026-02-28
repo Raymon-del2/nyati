@@ -8,22 +8,13 @@ export default function OverviewPage() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalRequests, setTotalRequests] = useState(0);
+  const [dailyRequests, setDailyRequests] = useState(0);
   const [lastPing, setLastPing] = useState<string | null>(null);
   const [activityLog, setActivityLog] = useState<string[]>([]);
 
   useEffect(() => {
     fetchKeys();
-    // Demo activity for visualization
-    const demoInterval = setInterval(() => {
-      const now = new Date();
-      const time = now.toLocaleTimeString('en-US', { hour12: false });
-      const endpoints = ['/v1/proxy', '/v1/transduce', '/v1/validate', '/v1/stats'];
-      const endpoint = endpoints[Math.floor(Math.random() * endpoints.length)];
-      const newLog = `[${time}] GET ${endpoint} - 200 OK`;
-      setActivityLog(prev => [newLog, ...prev].slice(0, 10));
-      setTotalRequests(prev => prev + Math.floor(Math.random() * 10));
-    }, 3000);
-    return () => clearInterval(demoInterval);
+    fetchDailyUsage();
   }, []);
 
   async function fetchKeys() {
@@ -42,6 +33,23 @@ export default function OverviewPage() {
       fetchRealUsage(data[0].key_hint);
     }
     setLoading(false);
+  }
+
+  async function fetchDailyUsage() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const now = new Date();
+    const dayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const { data } = await supabase
+      .from('daily_rate_limits')
+      .select('count')
+      .eq('user_id', user.id)
+      .eq('day_key', dayKey)
+      .maybeSingle();
+
+    setDailyRequests(data?.count || 0);
   }
 
   async function fetchRealUsage(keyHint: string) {
@@ -69,12 +77,13 @@ export default function OverviewPage() {
 
   const activeKeys = keys.filter(k => k.is_active).length;
   const usagePercent = Math.min(Math.round((totalRequests / 10000) * 100), 100);
+  const remainingRequests = Math.max(100 - dailyRequests, 0);
 
   const stats = [
     { label: 'Total Requests', value: totalRequests.toLocaleString(), icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
     { label: 'Active Keys', value: activeKeys.toString(), icon: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z' },
     { label: 'Current Tier', value: 'Free', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
-    { label: 'Usage', value: `${usagePercent}%`, icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+    { label: 'Daily Remaining', value: `${remainingRequests}/100`, icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
   ];
 
   return (

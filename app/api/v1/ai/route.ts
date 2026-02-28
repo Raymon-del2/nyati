@@ -4,16 +4,9 @@ import { hashKeyWithSalt, constantTimeCompare } from '@/lib/keygen';
 
 export const runtime = 'edge';
 
-// Get Groq API keys from environment (Edge compatible)
-function getGroqKeys(): string[] {
-  const envKeys = process.env.GROQ_API_KEYS;
-  if (envKeys) {
-    const keys = envKeys.split(',').map(k => k.trim()).filter(k => k.startsWith('gsk_'));
-    if (keys.length > 0) return keys;
-  }
-  const singleKey = process.env.GROQ_API_KEY;
-  if (singleKey && singleKey.startsWith('gsk_')) return [singleKey];
-  return [];
+// Get AI service URL
+function getAIServiceUrl(): string {
+  return process.env.AI_SERVICE_URL || 'http://localhost:11434';
 }
 
 // Sensitive words to redact in stream
@@ -71,127 +64,243 @@ function createTransformStream(): TransformStream<Uint8Array, Uint8Array> {
   });
 }
 
-// Validate API key
-async function validateKey(apiKey: string): Promise<{ valid: boolean; keyId?: string }> {
+// Validate API key and get user info
+async function validateKey(apiKey: string): Promise<{ valid: boolean; keyId?: string; userId?: string }> {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !supabaseKey) return { valid: false };
+    console.log('[VALIDATE] Starting validation for key:', apiKey.substring(0, 10) + '...');
+    
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    console.log('[VALIDATE] Supabase URL exists:', !!supabaseUrl);
+    console.log('[VALIDATE] Supabase Key exists:', !!supabaseKey);
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.log('[VALIDATE] Missing Supabase config');
+      return { valid: false };
+    }
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
     const prefix = apiKey.substring(0, 4);
     const lastFour = apiKey.substring(apiKey.length - 4);
     const keyHint = `${prefix}...${lastFour}`;
+    console.log('[VALIDATE] Key hint:', keyHint);
     
-    const { data: keyData } = await supabase
+    const { data: keyData, error } = await supabase
       .from('api_keys')
-      .select('id, salt, secret_hash, is_active')
+      .select('id, user_id, salt, secret_hash, is_active')
       .eq('key_hint', keyHint)
       .eq('is_active', true)
       .maybeSingle();
     
-    if (!keyData) return { valid: false };
+    console.log('[VALIDATE] Key data found:', !!keyData);
+    console.log('[VALIDATE] Supabase error:', error);
+    
+    if (!keyData) {
+      console.log('[VALIDATE] No key data found for hint:', keyHint);
+      return { valid: false };
+    }
     
     const computedHash = await hashKeyWithSalt(apiKey, keyData.salt);
     const isValid = await constantTimeCompare(computedHash, keyData.secret_hash);
+    console.log('[VALIDATE] Hash comparison result:', isValid);
     
-    return { valid: isValid, keyId: isValid ? keyData.id : undefined };
-  } catch {
+    return { valid: isValid, keyId: isValid ? keyData.id : undefined, userId: isValid ? keyData.user_id : undefined };
+  } catch (e) {
+    console.log('[VALIDATE] Exception:', e);
     return { valid: false };
+  }
+}
+
+// Check daily rate limit
+async function checkDailyRateLimit(userId: string): Promise<{ allowed: boolean; remaining: number; resetTime: string }> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Get or create daily limit record
+    const { data: record, error } = await supabase
+      .from('daily_rate_limits')
+      .select('requests_used')
+      .eq('user_id', userId)
+      .eq('date', today)
+      .maybeSingle();
+    
+    if (error) {
+      console.log('[RATE LIMIT] Error checking rate limit:', error);
+      return { allowed: true, remaining: 100, resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() };
+    }
+    
+    const requestsUsed = record?.requests_used || 0;
+    const dailyLimit = 100;
+    const remaining = Math.max(0, dailyLimit - requestsUsed);
+    
+    if (requestsUsed >= dailyLimit) {
+      return { allowed: false, remaining: 0, resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() };
+    }
+    
+    // Increment usage
+    if (record) {
+      await supabase
+        .from('daily_rate_limits')
+        .update({ requests_used: requestsUsed + 1 })
+        .eq('user_id', userId)
+        .eq('date', today);
+    } else {
+      await supabase
+        .from('daily_rate_limits')
+        .insert({ user_id: userId, date: today, requests_used: 1 });
+    }
+    
+    return { allowed: true, remaining: remaining - 1, resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() };
+  } catch (e) {
+    console.log('[RATE LIMIT] Exception:', e);
+    return { allowed: true, remaining: 100, resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() };
   }
 }
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
-  }
-  
-  const apiKey = authHeader.replace('Bearer ', '');
-  
-  // Demo mode: allow ry_live_demo_key for testing
-  if (apiKey !== 'ry_live_demo_key') {
-    const validation = await validateKey(apiKey);
-    if (!validation.valid) {
-      return NextResponse.json({ error: 'Invalid API key' }, { status: 403 });
-    }
-  }
   
   try {
-    const body = await request.json();
-    const isStreaming = body.stream === true;
-    
-    // Truncate max_tokens to 500
-    if (body.max_tokens && body.max_tokens > 500) {
-      body.max_tokens = 500;
+    // Get API key from Authorization header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Missing or invalid API key' },
+        { status: 401 }
+      );
     }
-    if (!body.max_tokens) {
-      body.max_tokens = 500;
+
+    const apiKey = authHeader.substring(7);
+    
+    // Validate API key and get user info
+    const validation = await validateKey(apiKey);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: 'Invalid API key' },
+        { status: 401 }
+      );
     }
-    
-    const groqKeys = getGroqKeys();
-    if (groqKeys.length === 0) {
-      return NextResponse.json({ error: 'No Groq API keys configured' }, { status: 500 });
-    }
-    const groqKey = groqKeys[Math.floor(Math.random() * groqKeys.length)];
-    
-    // Forward to Groq with streaming
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${groqKey}`,
-        'User-Agent': 'Nyati-Proxy/1.0',
-        'Accept': 'text/event-stream'
-      },
-      body: JSON.stringify({
-        model: body.model || 'llama3-8b-8192',
-        messages: body.messages,
-        max_tokens: body.max_tokens,
-        temperature: body.temperature || 0.7,
-        stream: isStreaming
-      })
-    });
-    
-    if (!res.ok) {
-      const error = await res.text();
-      return NextResponse.json({ 
-        error: 'Groq API error', 
-        details: error.substring(0, 200)
-      }, { status: res.status });
-    }
-    
-    // Stream response
-    if (isStreaming && res.body) {
-      const transformStream = createTransformStream();
-      
-      return new NextResponse(
-        res.body.pipeThrough(transformStream),
-        {
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            'X-Nyati-Provider': 'groq',
-            'X-Nyati-Shield': 'active',
-            'X-Nyati-Start-Time': startTime.toString()
+
+    // Check daily rate limit
+    const rateLimitCheck = await checkDailyRateLimit(validation.userId!);
+    if (!rateLimitCheck.allowed) {
+      return NextResponse.json(
+        { 
+          error: 'Daily rate limit exceeded',
+          usage: {
+            requests_remaining: 0,
+            reset_time: rateLimitCheck.resetTime
           }
-        }
+        },
+        { status: 429 }
+      );
+    }
+
+    const body = await request.json();
+    const { message, model = 'nyati-core01' } = body;
+    
+    if (!message) {
+      return NextResponse.json(
+        { error: 'Message is required' },
+        { status: 400 }
       );
     }
     
-    // Non-streaming
-    const data = await res.json();
-    return NextResponse.json(data, {
+    // For test keys, enforce short conversation limits
+    if (apiKey.startsWith('tk_')) {
+      // Limit message length for test keys
+      if (message.length > 500) {
+        return NextResponse.json(
+          { error: 'Test keys limited to short messages (max 500 characters)' },
+          { status: 400 }
+        );
+      }
+    }
+    
+    const aiUrl = getAIServiceUrl();
+    
+    console.log('[NYATI AI] Using AI service at:', aiUrl);
+    console.log('[NYATI AI] Model:', model);
+    
+    // Convert to AI service format
+    const aiBody = {
+      model: model,
+      messages: [
+        {
+          role: 'user',
+          content: message
+        }
+      ],
+      options: {
+        temperature: 0.7,
+        num_predict: 500
+      }
+    };
+    
+    // Forward to AI service
+    const res = await fetch(`${aiUrl}/api/chat`, {
+      method: 'POST',
       headers: {
-        'X-Nyati-Provider': 'groq',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(aiBody)
+    });
+    
+    console.log('[NYATI AI] AI service response status:', res.status);
+    
+    if (!res.ok) {
+      const error = await res.text();
+      console.log('[NYATI AI] AI service error:', error);
+      return NextResponse.json({ 
+        error: 'AI service error', 
+        details: error.substring(0, 500),
+        ai_url: aiUrl
+      }, { status: res.status });
+    }
+    
+    // Read response as text
+    const responseText = await res.text();
+    console.log('[NYATI AI] Raw response:', responseText.substring(0, 200));
+    
+    // Parse response
+    const lines = responseText.trim().split('\n').filter(line => line.trim());
+    let fullContent = '';
+    
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed.message?.content) {
+          fullContent += parsed.message.content;
+        }
+      } catch (e) {
+        console.log('[NYATI AI] Failed to parse line:', line.substring(0, 50));
+      }
+    }
+    
+    // Convert to response format
+    const openaiResponse = {
+      content: fullContent,
+      type: 'text',
+      model: model,
+      usage: {
+        requests_remaining: rateLimitCheck.remaining,
+        reset_time: rateLimitCheck.resetTime
+      }
+    };
+    
+    return NextResponse.json(openaiResponse, {
+      headers: {
+        'X-Nyati-Provider': 'nyati-core01',
         'X-Nyati-Shield': 'active'
       }
     });
   } catch (error: any) {
+    console.log('[NYATI AI] Error:', error.message);
     return NextResponse.json({ 
       error: 'Request failed', 
       message: error.message 

@@ -5,27 +5,29 @@ import { hashKeyWithSalt, constantTimeCompare } from '@/lib/keygen';
 export const runtime = 'edge';
 
 // In-memory cache for validated keys (Edge function instance reuse)
-const keyCache = new Map<string, { keyId: string; targetUrl: string; salt: string; secretHash: string; expires: number }>();
+const keyCache = new Map<string, { keyId: string; userId: string; targetUrl: string; salt: string; secretHash: string; expires: number }>();
 const CACHE_TTL = 30000; // 30 seconds
 
 interface ValidationResult {
   valid: boolean;
   keyId?: string;
+  userId?: string;
   targetUrl?: string;
   latency: number;
 }
 
 // High-performance validation with caching
 async function validateApiKey(apiKey: string): Promise<ValidationResult> {
-  const startTime = performance.now();
+  const startTime = Date.now();
   
   // Check cache first
   const cached = keyCache.get(apiKey);
   if (cached && cached.expires > Date.now()) {
-    const endTime = performance.now();
+    const endTime = Date.now();
     return {
       valid: true,
       keyId: cached.keyId,
+      userId: cached.userId,
       targetUrl: cached.targetUrl,
       latency: endTime - startTime
     };
@@ -45,16 +47,16 @@ async function validateApiKey(apiKey: string): Promise<ValidationResult> {
     const lastFour = apiKey.substring(apiKey.length - 4);
     const keyHint = `${prefix}...${lastFour}`;
     
-    // Retrieve key data with salt and target_url
+    // Retrieve key data with salt, target_url, and user_id
     const { data: keyData } = await supabase
       .from('api_keys')
-      .select('id, salt, secret_hash, target_url, is_active')
+      .select('id, user_id, salt, secret_hash, target_url, is_active')
       .eq('key_hint', keyHint)
       .eq('is_active', true)
       .maybeSingle();
     
     if (!keyData) {
-      const endTime = performance.now();
+      const endTime = Date.now();
       return { valid: false, latency: endTime - startTime };
     }
     
@@ -68,6 +70,7 @@ async function validateApiKey(apiKey: string): Promise<ValidationResult> {
     if (isValid) {
       keyCache.set(apiKey, {
         keyId: keyData.id,
+        userId: keyData.user_id,
         targetUrl: keyData.target_url,
         salt: keyData.salt,
         secretHash: keyData.secret_hash,
@@ -75,16 +78,17 @@ async function validateApiKey(apiKey: string): Promise<ValidationResult> {
       });
     }
     
-    const endTime = performance.now();
+    const endTime = Date.now();
     
     return {
       valid: isValid,
       keyId: isValid ? keyData.id : undefined,
+      userId: isValid ? keyData.user_id : undefined,
       targetUrl: isValid ? keyData.target_url : undefined,
       latency: endTime - startTime
     };
   } catch (error) {
-    const endTime = performance.now();
+    const endTime = Date.now();
     return { valid: false, latency: endTime - startTime };
   }
 }
@@ -189,7 +193,62 @@ async function checkRateLimit(keyId: string): Promise<{ allowed: boolean; remain
   }
 }
 
-// Forward request to target server - optimized streaming with AI support
+// Check daily rate limit per user (100 requests per day)
+async function checkDailyRateLimit(userId: string): Promise<{ allowed: boolean; remaining: number; resetTime: string }> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      return { allowed: true, remaining: 100, resetTime: new Date(Date.now() + 86400000).toISOString() };
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Get current day timestamp (YYYY-MM-DD)
+    const now = new Date();
+    const dayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    // Check current count for this user + day
+    const { data: limitData } = await supabase
+      .from('daily_rate_limits')
+      .select('count')
+      .eq('user_id', userId)
+      .eq('day_key', dayKey)
+      .maybeSingle();
+    
+    const currentCount = limitData?.count || 0;
+    const maxRequests = 100; // 100 requests per day
+    
+    // Calculate reset time (next midnight UTC)
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    
+    if (currentCount >= maxRequests) {
+      return { allowed: false, remaining: 0, resetTime: tomorrow.toISOString() };
+    }
+    
+    // Increment or insert
+    if (limitData) {
+      await supabase.from('daily_rate_limits')
+        .update({ count: currentCount + 1 })
+        .eq('user_id', userId)
+        .eq('day_key', dayKey);
+    } else {
+      await supabase.from('daily_rate_limits').insert({
+        user_id: userId,
+        day_key: dayKey,
+        count: 1
+      });
+    }
+    
+    return { allowed: true, remaining: maxRequests - currentCount - 1, resetTime: tomorrow.toISOString() };
+  } catch {
+    // Fail open - allow request if rate limit check fails
+    return { allowed: true, remaining: 100, resetTime: new Date(Date.now() + 86400000).toISOString() };
+  }
+}
 async function forwardRequest(
   targetUrl: string,
   method: string,
@@ -200,7 +259,7 @@ async function forwardRequest(
   aiProvider?: string,
   aiApiKey?: string
 ): Promise<{ success: boolean; response?: Response; error?: string; latency: number; forwardLatency: number }> {
-  const forwardStartTime = performance.now();
+  const forwardStartTime = Date.now();
   
   try {
     // Build headers for forwarding
@@ -241,7 +300,7 @@ async function forwardRequest(
     
     const targetResponse = await fetch(targetUrl, fetchOptions);
     
-    const forwardEndTime = performance.now();
+    const forwardEndTime = Date.now();
     const forwardLatency = forwardEndTime - forwardStartTime;
     
     // Log latency to database (async, don't wait)
@@ -254,7 +313,7 @@ async function forwardRequest(
       forwardLatency
     };
   } catch (error: any) {
-    const endTime = performance.now();
+    const endTime = Date.now();
     return {
       success: false,
       error: error.message || 'Forward request failed',
@@ -354,9 +413,35 @@ export async function POST(request: NextRequest) {
     return response;
   }
   
-  // Check rate limit before forwarding (Nyati Shield)
-  const rateLimit = await checkRateLimit(validation.keyId!);
-  if (!rateLimit.allowed) {
+  // Check daily rate limit per user (100 requests per day) - excludes key generation
+  let dailyLimitResult = { allowed: true, remaining: 100, resetTime: new Date(Date.now() + 86400000).toISOString() };
+  const isKeyGeneration = pathname.includes('/api-keys') || pathname.includes('/keys');
+  if (!isKeyGeneration && validation.userId) {
+    dailyLimitResult = await checkDailyRateLimit(validation.userId);
+    if (!dailyLimitResult.allowed) {
+      return NextResponse.json(
+        { 
+          error: 'Rate limit exceeded',
+          message: 'Daily limit: 100 requests per day. Upgrade for more.',
+          retry_after: Math.ceil((new Date(dailyLimitResult.resetTime).getTime() - Date.now()) / 1000),
+          reset_time: dailyLimitResult.resetTime
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((new Date(dailyLimitResult.resetTime).getTime() - Date.now()) / 1000)),
+            'X-Nyati-Rate-Limit': '100/day',
+            'X-Nyati-Limit-Remaining': String(dailyLimitResult.remaining),
+            'X-Nyati-Limit-Reset': dailyLimitResult.resetTime
+          }
+        }
+      );
+    }
+  }
+  
+  // Also check per-minute rate limit for burst protection (5 req/min per key)
+  const burstLimit = await checkRateLimit(validation.keyId!);
+  if (!burstLimit.allowed) {
     return NextResponse.json(
       { 
         error: 'Rate limit exceeded',
@@ -422,7 +507,7 @@ export async function POST(request: NextRequest) {
     'X-Nyati-Verified': 'true',
     'X-Nyati-Validation-Time-Ms': validation.latency.toFixed(2),
     'X-Nyati-Forward-Time-Ms': forwardResult.forwardLatency.toFixed(2),
-    'X-Nyati-Limit-Remaining': String(rateLimit.remaining),
+    'X-Nyati-Limit-Remaining': String(dailyLimitResult.remaining),
     'X-Nyati-Provider': aiProvider || 'custom',
   };
   

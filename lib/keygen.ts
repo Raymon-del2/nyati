@@ -1,9 +1,9 @@
-const KEY_PREFIXES = ['ry_', 'pk_', '01a4_', 'ny_', 'sk_'] as const;
+const KEY_PREFIXES = ['sk_', 'pk_', 'rk_', 'tk_', 'mk_'] as const;
 const KEY_LENGTH = 32;
 
 export type KeyPrefix = typeof KEY_PREFIXES[number];
 
-export function generateApiKey(prefix: KeyPrefix = 'ry_'): string {
+export function generateApiKey(prefix: KeyPrefix = 'sk_'): string {
   const randomPart = generateRandomString(KEY_LENGTH);
   return `${prefix}${randomPart}`;
 }

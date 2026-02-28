@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { generateApiKey, createKeyHint, hashKey, KEY_PREFIXES } from '@/lib/keygen';
+import { isDisposableEmail } from '@/lib/email-validation';
 import type { ApiKey } from '@/lib/supabase';
 
 export default function Dashboard() {
@@ -131,6 +132,13 @@ export default function Dashboard() {
         });
         if (error) throw error;
       } else {
+        // Check for disposable email on sign up
+        if (isDisposableEmail(email)) {
+          alert('Please use a valid email address. Temporary or disposable email addresses are not allowed.');
+          setIsLoadingAuth(false);
+          return;
+        }
+        
         const { error } = await supabase.auth.signUp({
           email,
           password

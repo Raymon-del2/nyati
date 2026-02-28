@@ -27,6 +27,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Skip validation for AI endpoint (uses Ollama locally, no API key needed)
+  if (request.nextUrl.pathname.startsWith('/api/v1/ai')) {
+    return NextResponse.next();
+  }
+
+  // Skip validation for internal AI endpoint (developer chat uses this directly)
+  if (request.nextUrl.pathname.startsWith('/api/internal/ai')) {
+    return NextResponse.next();
+  }
+
   if (!request.nextUrl.pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
