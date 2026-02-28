@@ -286,10 +286,16 @@ export default function Dashboard() {
               </>
             )}
           </div>
+
+          <div className="mt-6 text-center">
+            <a href="/docs" className="text-gray-500 hover:text-teal-400 text-sm transition-colors">
+              Read the Docs →
+            </a>
+          </div>
         </div>
 
         <footer className="py-6 text-center text-gray-600 text-sm">
-          © 2026 Nyati. Built for developers.
+          &copy; 2026 Nyati. Built for developers.
         </footer>
       </div>
     );

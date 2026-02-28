@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
 
@@ -26,6 +27,14 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
       if (data?.username) {
         setProfileUsername(data.username.replace(/^@/, ''));
       }
+    }
+  }
+
+  function goToDashboard() {
+    if (profileUsername) {
+      router.push(`/${profileUsername}`);
+    } else {
+      router.push('/');
     }
   }
 

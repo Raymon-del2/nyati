@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { generateApiKey, createKeyHint, hashKey, KEY_PREFIXES } from '@/lib/keygen';
+import { generateApiKey, createKeyHint, hashKeyWithSalt, generateSalt, KEY_PREFIXES } from '@/lib/keygen';
 import type { ApiKey } from '@/lib/supabase';
 
 export default function ApiKeysPage() {
@@ -32,14 +32,15 @@ export default function ApiKeysPage() {
   }
 
   async function handleGenerateKey() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
     setGenerating(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
       const fullKey = generateApiKey(selectedPrefix as any);
       const hint = createKeyHint(fullKey);
-      const hashed = await hashKey(fullKey);
+      const salt = await generateSalt();
+      const hashed = await hashKeyWithSalt(fullKey, salt);
 
       const { error } = await supabase
         .from('api_keys')
@@ -47,6 +48,7 @@ export default function ApiKeysPage() {
           user_id: user.id,
           key_hint: hint,
           secret_hash: hashed,
+          salt: salt,
           tier: 'free'
         });
 
@@ -65,6 +67,17 @@ export default function ApiKeysPage() {
     const { error } = await supabase
       .from('api_keys')
       .update({ is_active: false })
+      .eq('id', keyId);
+
+    if (!error) {
+      fetchKeys();
+    }
+  }
+
+  async function handleDeleteKey(keyId: string) {
+    const { error } = await supabase
+      .from('api_keys')
+      .delete()
       .eq('id', keyId);
 
     if (!error) {
@@ -199,12 +212,19 @@ export default function ApiKeysPage() {
                     {new Date(key.created_at).toLocaleDateString()}
                   </td>
                   <td className="p-4 text-right">
-                    {key.is_active && (
+                    {key.is_active ? (
                       <button
                         onClick={() => handleRevokeKey(key.id)}
                         className="text-red-500 hover:text-red-400 text-sm transition-colors"
                       >
                         Revoke
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleDeleteKey(key.id)}
+                        className="text-gray-600 hover:text-red-500 text-sm transition-colors"
+                      >
+                        Delete
                       </button>
                     )}
                   </td>

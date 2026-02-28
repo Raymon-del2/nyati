@@ -6,6 +6,16 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export async function middleware(request: NextRequest) {
+  // Skip validation for docs (public)
+  if (request.nextUrl.pathname.startsWith('/docs')) {
+    return NextResponse.next();
+  }
+
+  // Skip validation for proxy endpoint (handles its own validation)
+  if (request.nextUrl.pathname.startsWith('/api/v1/proxy')) {
+    return NextResponse.next();
+  }
+
   // Skip validation for ping endpoint
   if (request.nextUrl.pathname.startsWith('/api/v1/ping')) {
     return NextResponse.next();

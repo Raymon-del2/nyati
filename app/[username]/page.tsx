@@ -17,7 +17,7 @@ export default function OverviewPage() {
     const demoInterval = setInterval(() => {
       const now = new Date();
       const time = now.toLocaleTimeString('en-US', { hour12: false });
-      const endpoints = ['/v1/ping', '/v1/transduce', '/v1/validate', '/v1/stats'];
+      const endpoints = ['/v1/proxy', '/v1/transduce', '/v1/validate', '/v1/stats'];
       const endpoint = endpoints[Math.floor(Math.random() * endpoints.length)];
       const newLog = `[${time}] GET ${endpoint} - 200 OK`;
       setActivityLog(prev => [newLog, ...prev].slice(0, 10));
@@ -46,7 +46,7 @@ export default function OverviewPage() {
 
   async function fetchRealUsage(keyHint: string) {
     try {
-      const response = await fetch('/api/v1/ping', {
+      const response = await fetch('/api/v1/proxy', {
         headers: { 'Authorization': `Bearer ${keyHint}` }
       });
       if (response.ok) {
@@ -59,7 +59,7 @@ export default function OverviewPage() {
         const now = new Date();
         const time = now.toLocaleTimeString('en-US', { hour12: false });
         const status = data.mode === 'demo' ? '200 OK (Demo)' : '200 OK';
-        const newLog = `[${time}] POST /v1/ping - ${status}`;
+        const newLog = `[${time}] POST /v1/proxy - ${status}`;
         setActivityLog(prev => [newLog, ...prev].slice(0, 10));
       }
     } catch (e) {
@@ -116,17 +116,17 @@ export default function OverviewPage() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-gray-400 text-sm">Endpoint</span>
             <button
-              onClick={() => navigator.clipboard.writeText('https://nyati.io/api/v1/ping')}
+              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/v1/proxy`)}
               className="text-teal-400 hover:text-teal-300 text-sm"
             >
               Copy
             </button>
           </div>
-          <code className="text-white font-mono text-sm">https://nyati.io/api/v1/ping</code>
+          <code className="text-white font-mono text-sm">{window.location.origin}/api/v1/proxy</code>
           <div className="mt-4 pt-4 border-t border-[#222]">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-400">Test your key:</span>
-              <code className="text-teal-400 text-xs">curl -H "Authorization: Bearer YOUR_KEY" https://nyati.io/api/v1/ping</code>
+              <code className="text-teal-400 text-xs">curl -H "Authorization: Bearer YOUR_KEY" {window.location.origin}/api/v1/proxy</code>
             </div>
           </div>
         </div>
