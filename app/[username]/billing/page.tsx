@@ -41,7 +41,7 @@ export default function BillingPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const fullKey = generateApiKey('ry_');
+      const fullKey = generateApiKey('tk_');
       const hint = createKeyHint(fullKey);
       const salt = await generateSalt();
       const hashed = await hashKeyWithSalt(fullKey, salt);
