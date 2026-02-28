@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 // Mock data for demo - in production this would come from a database
 const mockSearchResults: Record<string, any[]> = {
   web: [
