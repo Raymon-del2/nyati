@@ -56,7 +56,7 @@ export default function APIReferencePage() {
           <h2 className="text-2xl font-semibold text-white mb-4">Base URL</h2>
           <CodeBlock
             language="text"
-            code={`https://api.nyati.io/v1`}
+            code={`https://nyaticore.vercel.app/api/v1`}
           />
         </div>
 

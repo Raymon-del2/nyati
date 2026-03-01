@@ -6,7 +6,7 @@ Nyati is a high-performance API key management platform designed for massive sca
 
 - **Node.js 18+** (Required for Next.js 14)
 - **npm** or **yarn**
-- **Supabase account** ([Create free account](https://supabase.com))
+- **Supabase account** ([Create free account](https://nyaticore.vercel.app/api/v1m))
 - **Ollama instance** or **Hugging Face Space** (for AI chat in /developer page)
 
 ## Quick Start for Developers

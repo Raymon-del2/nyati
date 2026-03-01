@@ -420,14 +420,14 @@ export default function ApiKeysPage() {
                 <div>
                   <h4 className="text-sm font-medium text-gray-400 mb-2">AI Chat Endpoint</h4>
                   <code className="block bg-[#111] px-4 py-3 rounded-lg text-teal-400 font-mono text-sm">
-                    POST https://api.nyati.io/v1/ai
+                    POST https://nyaticore.vercel.app/api/v1/ai
                   </code>
                 </div>
                 
                 <div>
                   <h4 className="text-sm font-medium text-gray-400 mb-2">JSON Search/Index Endpoint</h4>
                   <code className="block bg-[#111] px-4 py-3 rounded-lg text-blue-400 font-mono text-sm">
-                    POST https://api.nyati.io/v1/search
+                    POST https://nyaticore.vercel.app/api/v1/search
                   </code>
                 </div>
               </div>
@@ -436,7 +436,7 @@ export default function ApiKeysPage() {
               <div>
                 <h4 className="text-sm font-medium text-gray-400 mb-2">AI Chat Example (Short conversations)</h4>
                 <pre className="bg-[#111] p-4 rounded-lg overflow-x-auto">
-                  <code className="text-sm font-mono text-gray-300">{`const response = await fetch('https://api.nyati.io/v1/ai', {
+                  <code className="text-sm font-mono text-gray-300">{`const response = await fetch('https://nyaticore.vercel.app/api/v1/ai', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -457,7 +457,7 @@ console.log(data);`}</code>
               <div>
                 <h4 className="text-sm font-medium text-gray-400 mb-2">JSON Search Example (For search engines)</h4>
                 <pre className="bg-[#111] p-4 rounded-lg overflow-x-auto">
-                  <code className="text-sm font-mono text-gray-300">{`const response = await fetch('https://api.nyati.io/v1/search', {
+                  <code className="text-sm font-mono text-gray-300">{`const response = await fetch('https://nyaticore.vercel.app/api/v1/search', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -482,7 +482,7 @@ console.log(data);`}</code>
                     <code className="text-sm font-mono text-gray-300">{`{
   "content": "AI response text",
   "type": "text", // Can be: text, image, video, audio
-  "media_url": "https://cdn.nyati.io/...", // For image/video content
+  "media_url": "https://nyaticore.vercel.app/...", // For image/video content
   "model": "nyati-core01",
   "usage": {
     "requests_remaining": 99,
@@ -537,7 +537,7 @@ console.log(data);`}</code>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => {
-                    const code = `const response = await fetch('https://api.nyati.io/v1/ai', {
+                    const code = `const response = await fetch('https://nyaticore.vercel.app/api/v1/ai', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -563,7 +563,7 @@ console.log(data);`;
                 
                 <button
                   onClick={() => {
-                    const code = `const response = await fetch('https://api.nyati.io/v1/search', {
+                    const code = `const response = await fetch('https://nyaticore.vercel.app/api/v1/search', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',

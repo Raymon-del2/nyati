@@ -38,7 +38,7 @@ Nyati is an AI-powered data platform that provides:
 
 **1. AI Chat Endpoint**
 ```
-POST https://api.nyati.io/v1/ai
+POST https://nyaticore.vercel.app/api/v1/ai
 Headers:
   - Content-Type: application/json
   - Authorization: Bearer YOUR_API_KEY
@@ -63,7 +63,7 @@ Response:
 
 **2. JSON Search Endpoint**
 ```
-POST https://api.nyati.io/v1/search
+POST https://nyaticore.vercel.app/api/v1/search
 Headers:
   - Content-Type: application/json
   - Authorization: Bearer YOUR_API_KEY
@@ -173,7 +173,7 @@ Response:
 
 ### JavaScript/TypeScript:
 ```javascript
-const response = await fetch('https://api.nyati.io/v1/ai', {
+const response = await fetch('https://nyaticore.vercel.app/api/v1/ai', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -194,7 +194,7 @@ console.log(data.content);
 import requests
 
 response = requests.post(
-    'https://api.nyati.io/v1/ai',
+    'https://nyaticore.vercel.app/api/v1/ai',
     headers={
         'Content-Type': 'application/json',
         'Authorization': 'Bearer tk_your_key_here'

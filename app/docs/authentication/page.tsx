@@ -95,7 +95,7 @@ export default function AuthenticationPage() {
           <h3 className="text-lg font-medium text-white mb-3">cURL</h3>
           <CodeBlock
             language="bash"
-            code={`curl -X POST "https://api.nyati.io/v1/transduce" \\
+            code={`curl -X POST "https://nyaticore.vercel.app/api/v1/transduce" \\
   -H "Authorization: Bearer ry_pk_live_abc123xyz789" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -110,7 +110,7 @@ export default function AuthenticationPage() {
           <h3 className="text-lg font-medium text-white mb-3">JavaScript / TypeScript</h3>
           <CodeBlock
             language="typescript"
-            code={`const response = await fetch('https://api.nyati.io/v1/transduce', {
+            code={`const response = await fetch('https://nyaticore.vercel.app/api/v1/transduce', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer ry_pk_live_abc123xyz789',
