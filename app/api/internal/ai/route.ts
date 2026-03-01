@@ -94,19 +94,18 @@ export async function POST(request: NextRequest) {
       attempts++;
       console.log(`[INTERNAL AI] Attempt ${attempts}/${maxAttempts}`);
       
-      const res = await fetch(`${aiUrl}/api/chat`, {
+      const res = await fetch(`${aiUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ollama'  // Ollama doesn't check this but it's required for OpenAI format
         },
         body: JSON.stringify({
           model: model,
-          message: messagesWithContext[messagesWithContext.length - 1].content,
+          messages: messagesWithContext,
           stream: false,
-          options: {
-            temperature: temperature,
-            num_predict: max_tokens
-          }
+          temperature: temperature,
+          max_tokens: max_tokens
         })
       });
       
@@ -124,10 +123,13 @@ export async function POST(request: NextRequest) {
       
       try {
         const parsed = JSON.parse(responseText);
-        fullContent = parsed.message?.content || parsed.response || '';
+        // OpenAI format: choices[0].message.content
+        fullContent = parsed.choices?.[0]?.message?.content || 
+                      parsed.message?.content || 
+                      parsed.response || '';
         
         // If model is still loading, wait and retry
-        if (parsed.done_reason === 'load' || (!fullContent && !parsed.done)) {
+        if (!fullContent && (parsed.done_reason === 'load' || parsed.error)) {
           console.log('[INTERNAL AI] Model still loading, waiting...');
           await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
           continue;
