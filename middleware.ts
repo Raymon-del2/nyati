@@ -32,6 +32,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Skip validation for internal AI endpoint (developer chat uses this directly)
+  if (request.nextUrl.pathname.startsWith('/api/internal/ai')) {
+    return NextResponse.next();
+  }
+
   // Skip validation for test endpoint
   if (request.nextUrl.pathname.startsWith('/api/test-hf')) {
     return NextResponse.next();
