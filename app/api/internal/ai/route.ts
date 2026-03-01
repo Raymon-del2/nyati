@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'edge';
+// Allow up to 60 seconds for HF Space cold start
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
 // Get Nyati AI endpoint URL
 function getAIServiceUrl(): string {

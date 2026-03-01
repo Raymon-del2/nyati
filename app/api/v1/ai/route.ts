@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { hashKeyWithSalt, constantTimeCompare } from '@/lib/keygen';
 
-export const runtime = 'edge';
+// Allow up to 60 seconds for HF Space cold start
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
 // Get AI service URL
 function getAIServiceUrl(): string {
