@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     
     // Read response
     const responseText = await res.text();
-    console.log('[INTERNAL AI] Raw response:', responseText.substring(0, 200));
+    console.log('[INTERNAL AI] Full raw response:', responseText);
     
     // Parse response from Ollama (can be single JSON or NDJSON)
     let fullContent = '';
@@ -120,25 +120,31 @@ export async function POST(request: NextRequest) {
     try {
       // Try parsing as single JSON first
       const parsed = JSON.parse(responseText);
-      console.log('[INTERNAL AI] Parsed response:', JSON.stringify(parsed).substring(0, 200));
+      console.log('[INTERNAL AI] Parsed as single JSON:', JSON.stringify(parsed));
       if (parsed.message?.content) {
         fullContent = parsed.message.content;
       } else if (parsed.response) {
         fullContent = parsed.response;
       }
     } catch (e) {
+      console.log('[INTERNAL AI] Not single JSON, trying NDJSON...');
       // Try NDJSON format (line by line)
       const lines = responseText.trim().split('\n').filter(line => line.trim());
-      for (const line of lines) {
+      console.log('[INTERNAL AI] Number of lines:', lines.length);
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        console.log(`[INTERNAL AI] Line ${i}:`, line.substring(0, 100));
         try {
           const parsed = JSON.parse(line);
+          console.log(`[INTERNAL AI] Parsed line ${i}:`, JSON.stringify(parsed).substring(0, 100));
           if (parsed.message?.content) {
             fullContent += parsed.message.content;
+            console.log(`[INTERNAL AI] Added content from line ${i}`);
           } else if (parsed.response) {
             fullContent += parsed.response;
           }
         } catch (err) {
-          // Skip invalid lines
+          console.log(`[INTERNAL AI] Failed to parse line ${i}:`, err);
         }
       }
     }
