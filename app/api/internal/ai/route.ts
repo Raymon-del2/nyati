@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: model,
         message: messagesWithContext[messagesWithContext.length - 1].content,
+        stream: false,
         options: {
           temperature: temperature,
           num_predict: max_tokens
@@ -110,43 +111,15 @@ export async function POST(request: NextRequest) {
       }, { status: res.status });
     }
     
-    // Read response
+    // Read response (non-streaming, single JSON)
     const responseText = await res.text();
-    console.log('[INTERNAL AI] Full raw response:', responseText);
     
-    // Parse response from Ollama (can be single JSON or NDJSON)
     let fullContent = '';
-    
     try {
-      // Try parsing as single JSON first
       const parsed = JSON.parse(responseText);
-      console.log('[INTERNAL AI] Parsed as single JSON:', JSON.stringify(parsed));
-      if (parsed.message?.content) {
-        fullContent = parsed.message.content;
-      } else if (parsed.response) {
-        fullContent = parsed.response;
-      }
+      fullContent = parsed.message?.content || parsed.response || '';
     } catch (e) {
-      console.log('[INTERNAL AI] Not single JSON, trying NDJSON...');
-      // Try NDJSON format (line by line)
-      const lines = responseText.trim().split('\n').filter(line => line.trim());
-      console.log('[INTERNAL AI] Number of lines:', lines.length);
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        console.log(`[INTERNAL AI] Line ${i}:`, line.substring(0, 100));
-        try {
-          const parsed = JSON.parse(line);
-          console.log(`[INTERNAL AI] Parsed line ${i}:`, JSON.stringify(parsed).substring(0, 100));
-          if (parsed.message?.content) {
-            fullContent += parsed.message.content;
-            console.log(`[INTERNAL AI] Added content from line ${i}`);
-          } else if (parsed.response) {
-            fullContent += parsed.response;
-          }
-        } catch (err) {
-          console.log(`[INTERNAL AI] Failed to parse line ${i}:`, err);
-        }
-      }
+      console.error('[INTERNAL AI] Failed to parse response:', e);
     }
     
     console.log('[INTERNAL AI] Extracted content:', fullContent.substring(0, 100));
