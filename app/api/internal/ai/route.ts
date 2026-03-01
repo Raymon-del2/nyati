@@ -111,18 +111,31 @@ export async function POST(request: NextRequest) {
     // Read response
     const responseText = await res.text();
     
-    // Parse response from Nyati AI service
-    const lines = responseText.trim().split('\n').filter(line => line.trim());
+    // Parse response from Ollama (can be single JSON or NDJSON)
     let fullContent = '';
     
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        if (parsed.message?.content) {
-          fullContent += parsed.message.content;
+    try {
+      // Try parsing as single JSON first
+      const parsed = JSON.parse(responseText);
+      if (parsed.message?.content) {
+        fullContent = parsed.message.content;
+      } else if (parsed.response) {
+        fullContent = parsed.response;
+      }
+    } catch (e) {
+      // Try NDJSON format (line by line)
+      const lines = responseText.trim().split('\n').filter(line => line.trim());
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.message?.content) {
+            fullContent += parsed.message.content;
+          } else if (parsed.response) {
+            fullContent += parsed.response;
+          }
+        } catch (err) {
+          // Skip invalid lines
         }
-      } catch (e) {
-        console.log('[INTERNAL AI] Failed to parse response:', line.substring(0, 50));
       }
     }
     
