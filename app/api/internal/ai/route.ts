@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
     
     // Read response
     const responseText = await res.text();
+    console.log('[INTERNAL AI] Raw response:', responseText.substring(0, 200));
     
     // Parse response from Ollama (can be single JSON or NDJSON)
     let fullContent = '';
@@ -119,6 +120,7 @@ export async function POST(request: NextRequest) {
     try {
       // Try parsing as single JSON first
       const parsed = JSON.parse(responseText);
+      console.log('[INTERNAL AI] Parsed response:', JSON.stringify(parsed).substring(0, 200));
       if (parsed.message?.content) {
         fullContent = parsed.message.content;
       } else if (parsed.response) {
@@ -140,6 +142,8 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+    
+    console.log('[INTERNAL AI] Extracted content:', fullContent.substring(0, 100));
     
     // Return in standard format
     return NextResponse.json({
