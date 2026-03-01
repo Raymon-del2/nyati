@@ -7,9 +7,9 @@ export function useNyatiSound(isTyping: boolean, soundEnabled: boolean = true) {
   const hasPlayedRef = useRef(false);
 
   useEffect(() => {
-    // Initialize the 'Blip' sound
-    audioRef.current = new Audio('/sounds/452998__breviceps__blip-wave.wav');
-    audioRef.current.volume = 0.2; // Keep it subtle!
+    // Initialize the Nyati wave sound
+    audioRef.current = new Audio('/sounds/nyati-wave.wav');
+    audioRef.current.volume = 0.3; // Slightly louder for better presence
   }, []);
 
   useEffect(() => {

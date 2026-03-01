@@ -16,7 +16,8 @@ import {
   Zap,
   Link,
   Wrench,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { ApiKey } from '@/lib/supabase';
@@ -49,6 +50,7 @@ export default function DeveloperPage() {
   const [aiIndicatorStatus, setAiIndicatorStatus] = useState<'waiting' | 'typing' | 'idle'>('idle');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [showAlphaModal, setShowAlphaModal] = useState(false);
 
   // Sound effect hook
   useNyatiSound(aiIndicatorStatus === 'typing', soundEnabled);
@@ -685,12 +687,44 @@ export default function DeveloperPage() {
               {/* Footer */}
               <div className="mt-6 pt-4 border-t border-zinc-800">
                 <p className="text-xs text-gray-600 mb-3">Join the waitlist to get early access to the Architect API.</p>
-                <button className="w-full py-2.5 px-4 bg-teal-400/10 hover:bg-teal-400/20 border border-teal-400/30 rounded-lg text-teal-400 text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                <button 
+                  onClick={() => setShowAlphaModal(true)}
+                  className="w-full py-2.5 px-4 bg-teal-400/10 hover:bg-teal-400/20 border border-teal-400/30 rounded-lg text-teal-400 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                >
                   <Sparkles className="w-4 h-4" />
                   Request Alpha Access
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alpha Access Modal */}
+      {showAlphaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <button 
+              onClick={() => setShowAlphaModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-teal-400/20 rounded-lg flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-teal-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Alpha Access</h3>
+            </div>
+            <p className="text-gray-400 mb-4">
+              Your account will be reminded when v2 is out
+            </p>
+            <button 
+              onClick={() => setShowAlphaModal(false)}
+              className="w-full py-2.5 px-4 bg-teal-400 hover:bg-teal-500 rounded-lg text-zinc-900 text-sm font-semibold transition-colors"
+            >
+              Got it
+            </button>
           </div>
         </div>
       )}
