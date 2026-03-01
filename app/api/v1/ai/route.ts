@@ -6,7 +6,7 @@ export const runtime = 'edge';
 
 // Get AI service URL
 function getAIServiceUrl(): string {
-  return process.env.AI_SERVICE_URL || 'http://localhost:11434';
+  return process.env.OLLAMA_URL || 'http://localhost:11434';
 }
 
 // Sensitive words to redact in stream
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { message, model = 'nyati-core01' } = body;
+    const { message, model = 'llama3.2:1b' } = body;
     
     if (!message) {
       return NextResponse.json(
@@ -230,12 +230,7 @@ export async function POST(request: NextRequest) {
     // Convert to AI service format
     const aiBody = {
       model: model,
-      messages: [
-        {
-          role: 'user',
-          content: message
-        }
-      ],
+      message: message,
       options: {
         temperature: 0.7,
         num_predict: 500

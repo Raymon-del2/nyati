@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'edge';
 
 // Get Nyati AI endpoint URL
-function getNyatiAIUrl(): string {
-  return process.env.NYATI_AI_URL || 'https://api.nyati.io/v1/ai';
+function getAIServiceUrl(): string {
+  return process.env.OLLAMA_URL || 'https://nyaticore.vercel.app/api/v1/ai';
 }
 
 // Nyati Knowledge Base - System Context
@@ -60,7 +60,7 @@ Always be helpful, concise, and reference specific Nyati features when relevant.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { messages, model = 'Nyati-core01', temperature = 0.7, max_tokens = 500 } = body;
+    const { messages, model = 'llama3.2:1b', temperature = 0.7, max_tokens = 500 } = body;
     
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -69,9 +69,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const nyatiUrl = getNyatiAIUrl();
+    const aiUrl = getAIServiceUrl();
     
-    console.log('[INTERNAL AI] Using Nyati AI at:', nyatiUrl);
+    console.log('[INTERNAL AI] Using Nyati AI at:', aiUrl);
     console.log('[INTERNAL AI] Model:', model);
     
     // Prepend system message with Nyati knowledge
@@ -84,14 +84,14 @@ export async function POST(request: NextRequest) {
     ];
     
     // Forward to Nyati AI service
-    const res = await fetch(`${nyatiUrl}/api/chat`, {
+    const res = await fetch(`${aiUrl}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: model,
-        messages: messagesWithContext,
+        message: messagesWithContext[messagesWithContext.length - 1].content,
         options: {
           temperature: temperature,
           num_predict: max_tokens
