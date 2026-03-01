@@ -176,7 +176,7 @@ export default function DeveloperPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'Nyati-core01',
+          model: 'llama3.2:1b',
           messages: newMessages,
           max_tokens: 500,
           temperature: 0.7
