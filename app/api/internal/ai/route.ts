@@ -85,54 +85,68 @@ export async function POST(request: NextRequest) {
       ...messages
     ];
     
-    // Forward to Nyati AI service
-    const res = await fetch(`${aiUrl}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: model,
-        message: messagesWithContext[messagesWithContext.length - 1].content,
-        stream: false,
-        options: {
-          temperature: temperature,
-          num_predict: max_tokens
-        }
-      })
-    });
-    
-    if (!res.ok) {
-      const error = await res.text();
-      console.log('[INTERNAL AI] Nyati AI error:', error);
-      return NextResponse.json({ 
-        error: 'Nyati AI service error', 
-        details: error.substring(0, 500)
-      }, { status: res.status });
-    }
-    
-    // Read response (non-streaming, single JSON)
-    const responseText = await res.text();
-    console.log('[INTERNAL AI] Response length:', responseText.length);
-    console.log('[INTERNAL AI] Response preview:', responseText.substring(0, 500));
-    
+    // Retry logic for model loading
     let fullContent = '';
-    try {
-      const parsed = JSON.parse(responseText);
-      console.log('[INTERNAL AI] Parsed successfully:', JSON.stringify(parsed).substring(0, 200));
-      fullContent = parsed.message?.content || parsed.response || '';
-      console.log('[INTERNAL AI] Content extracted:', fullContent.substring(0, 100));
-    } catch (e) {
-      console.error('[INTERNAL AI] JSON parse error:', e);
-      console.error('[INTERNAL AI] Raw response was:', responseText.substring(0, 500));
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      attempts++;
+      console.log(`[INTERNAL AI] Attempt ${attempts}/${maxAttempts}`);
+      
+      const res = await fetch(`${aiUrl}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: model,
+          message: messagesWithContext[messagesWithContext.length - 1].content,
+          stream: false,
+          options: {
+            temperature: temperature,
+            num_predict: max_tokens
+          }
+        })
+      });
+      
+      if (!res.ok) {
+        const error = await res.text();
+        console.log('[INTERNAL AI] Nyati AI error:', error);
+        return NextResponse.json({ 
+          error: 'Nyati AI service error', 
+          details: error.substring(0, 500)
+        }, { status: res.status });
+      }
+      
+      const responseText = await res.text();
+      console.log('[INTERNAL AI] Response:', responseText.substring(0, 200));
+      
+      try {
+        const parsed = JSON.parse(responseText);
+        fullContent = parsed.message?.content || parsed.response || '';
+        
+        // If model is still loading, wait and retry
+        if (parsed.done_reason === 'load' || (!fullContent && !parsed.done)) {
+          console.log('[INTERNAL AI] Model still loading, waiting...');
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+          continue;
+        }
+        
+        // Success - we have content
+        if (fullContent) {
+          break;
+        }
+      } catch (e) {
+        console.error('[INTERNAL AI] Parse error:', e);
+      }
     }
     
     if (!fullContent) {
-      console.error('[INTERNAL AI] Empty content - response was:', responseText.substring(0, 500));
+      console.error('[INTERNAL AI] Empty content after all retries');
       return NextResponse.json({ 
-        error: 'Empty response from AI service',
-        choices: [{ message: { role: 'assistant', content: 'Sorry, I could not generate a response.' }}]
-      }, { status: 200 });
+        choices: [{ message: { role: 'assistant', content: 'The AI model is still warming up. Please try again in a moment.' }}]
+      });
     }
     
     // Return in standard format
