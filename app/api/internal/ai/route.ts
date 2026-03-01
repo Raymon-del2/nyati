@@ -113,16 +113,27 @@ export async function POST(request: NextRequest) {
     
     // Read response (non-streaming, single JSON)
     const responseText = await res.text();
+    console.log('[INTERNAL AI] Response length:', responseText.length);
+    console.log('[INTERNAL AI] Response preview:', responseText.substring(0, 500));
     
     let fullContent = '';
     try {
       const parsed = JSON.parse(responseText);
+      console.log('[INTERNAL AI] Parsed successfully:', JSON.stringify(parsed).substring(0, 200));
       fullContent = parsed.message?.content || parsed.response || '';
+      console.log('[INTERNAL AI] Content extracted:', fullContent.substring(0, 100));
     } catch (e) {
-      console.error('[INTERNAL AI] Failed to parse response:', e);
+      console.error('[INTERNAL AI] JSON parse error:', e);
+      console.error('[INTERNAL AI] Raw response was:', responseText.substring(0, 500));
     }
     
-    console.log('[INTERNAL AI] Extracted content:', fullContent.substring(0, 100));
+    if (!fullContent) {
+      console.error('[INTERNAL AI] Empty content - response was:', responseText.substring(0, 500));
+      return NextResponse.json({ 
+        error: 'Empty response from AI service',
+        choices: [{ message: { role: 'assistant', content: 'Sorry, I could not generate a response.' }}]
+      }, { status: 200 });
+    }
     
     // Return in standard format
     return NextResponse.json({
